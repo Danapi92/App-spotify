@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Bold circular neon accent ring + sound bars + play prism centered in 66dp safe zone (21..87) -->
+    <path
+        android:fillColor="#00F5A0"
+        android:pathData="M43,36 L43,72 L73,54 Z" />
+    <path
+        android:fillColor="#A855F7"
+        android:pathData="M31,44 C29.3,44 28,45.3 28,47 L28,61 C28,62.7 29.3,64 31,64 C32.7,64 34,62.7 34,61 L34,47 C34,45.3 32.7,44 31,44 Z" />
+    <path
+        android:fillColor="#C084FC"
+        android:pathData="M77,39 C75.3,39 74,40.3 74,42 L74,66 C74,67.7 75.3,69 77,69 C78.7,69 80,67.7 80,66 L80,42 C80,40.3 78.7,39 77,39 Z" />
+</vector>

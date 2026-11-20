@@ -1,0 +1,164 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and cloud preferences for STREAM MUSIC.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the user." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "email": { "type": "string", "description": "User email address (PII, owner-only)." },
+        "photoUrl": { "type": "string", "description": "Profile photo URL." },
+        "subscriptionTier": { "type": "string", "enum": ["free", "premium"], "description": "Membership tier." },
+        "preferredLanguage": { "type": "string", "enum": ["id", "en"], "description": "Preferred UI language." },
+        "preferredTheme": { "type": "string", "enum": ["dark", "light"], "description": "Preferred color theme." },
+        "audioQuality": { "type": "string", "enum": ["auto", "standard", "high"], "description": "Preferred audio streaming quality." },
+        "notificationsEnabled": { "type": "boolean", "description": "Playback & release notification preference." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "displayName", "subscriptionTier", "preferredLanguage", "preferredTheme", "audioQuality", "notificationsEnabled", "createdAt", "updatedAt"]
+    },
+    "SavedTrack": {
+      "title": "SavedTrack",
+      "description": "A legal track saved in a user's favorites or listening history.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "trackId": { "type": "string", "description": "Unique track identifier from legal catalog." },
+        "title": { "type": "string", "description": "Track title." },
+        "artistName": { "type": "string", "description": "Artist name." },
+        "albumTitle": { "type": "string", "description": "Album title." },
+        "artworkUrl": { "type": "string", "description": "Album cover image URL." },
+        "streamUrl": { "type": "string", "description": "Legal streaming URL." },
+        "downloadUrl": { "type": "string", "description": "Legal download URL if permitted." },
+        "durationSeconds": { "type": "integer", "description": "Track duration in seconds." },
+        "genre": { "type": "string", "description": "Music genre." },
+        "downloadable": { "type": "boolean", "description": "Whether legal offline download is permitted." },
+        "source": { "type": "string", "enum": ["audius", "deezer", "catalog"], "description": "Legal music provider." },
+        "playCount": { "type": "integer", "description": "Play count for history entries." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "trackId", "title", "artistName", "streamUrl", "durationSeconds", "downloadable", "source", "createdAt", "updatedAt"]
+    },
+    "SearchHistoryEntry": {
+      "title": "SearchHistoryEntry",
+      "description": "Recent search query saved by the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "query": { "type": "string", "description": "Search keyword." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp." }
+      },
+      "required": ["userId", "query", "createdAt"]
+    },
+    "UserDevice": {
+      "title": "UserDevice",
+      "description": "Registered playback device under user account.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "deviceName": { "type": "string", "description": "Device model name." },
+        "platform": { "type": "string", "description": "Operating system label." },
+        "active": { "type": "boolean", "description": "Whether device is currently active." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp." }
+      },
+      "required": ["userId", "deviceName", "platform", "active", "createdAt", "updatedAt"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "User-created public or private music playlist.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "Owner Firebase UID." },
+        "ownerName": { "type": "string", "description": "Owner display name." },
+        "name": { "type": "string", "description": "Playlist title." },
+        "description": { "type": "string", "description": "Playlist description." },
+        "coverUrl": { "type": "string", "description": "Cover artwork URL." },
+        "visibility": { "type": "string", "enum": ["public", "private"], "description": "Playlist visibility." },
+        "trackCount": { "type": "integer", "description": "Number of tracks in playlist." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["ownerId", "ownerName", "name", "visibility", "trackCount", "createdAt", "updatedAt"]
+    },
+    "PlaylistTrack": {
+      "title": "PlaylistTrack",
+      "description": "Track inside a playlist, with denormalized ownerId and visibility.",
+      "type": "object",
+      "properties": {
+        "playlistId": { "type": "string", "description": "Parent playlist ID." },
+        "ownerId": { "type": "string", "description": "Playlist owner UID." },
+        "visibility": { "type": "string", "enum": ["public", "private"], "description": "Mirrors parent playlist visibility." },
+        "trackId": { "type": "string", "description": "Legal catalog track ID." },
+        "title": { "type": "string", "description": "Track title." },
+        "artistName": { "type": "string", "description": "Artist name." },
+        "albumTitle": { "type": "string", "description": "Album title." },
+        "artworkUrl": { "type": "string", "description": "Cover URL." },
+        "streamUrl": { "type": "string", "description": "Legal stream URL." },
+        "downloadUrl": { "type": "string", "description": "Legal download URL." },
+        "durationSeconds": { "type": "integer", "description": "Duration in seconds." },
+        "genre": { "type": "string", "description": "Genre." },
+        "downloadable": { "type": "boolean", "description": "Download permission flag." },
+        "source": { "type": "string", "enum": ["audius", "deezer", "catalog"], "description": "Legal source." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp." }
+      },
+      "required": ["playlistId", "ownerId", "visibility", "trackId", "title", "artistName", "streamUrl", "durationSeconds", "downloadable", "source", "createdAt"]
+    },
+    "CatalogTrack": {
+      "title": "CatalogTrack",
+      "description": "Backend-managed legal music catalog entry.",
+      "type": "object",
+      "properties": {
+        "trackId": { "type": "string" },
+        "title": { "type": "string" },
+        "artistName": { "type": "string" },
+        "albumTitle": { "type": "string" },
+        "artworkUrl": { "type": "string" },
+        "streamUrl": { "type": "string" },
+        "durationSeconds": { "type": "integer" },
+        "genre": { "type": "string" },
+        "downloadable": { "type": "boolean" },
+        "published": { "type": "boolean" },
+        "licenseNote": { "type": "string" }
+      },
+      "required": ["trackId", "title", "artistName", "streamUrl", "durationSeconds", "downloadable", "published"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only user profile and cloud settings."
+    },
+    "/users/{userId}/favorites/{trackId}": {
+      "schema": { "$ref": "#/entities/SavedTrack" },
+      "description": "User favorite tracks."
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": { "$ref": "#/entities/SavedTrack" },
+      "description": "User listening history and play counts."
+    },
+    "/users/{userId}/search_history/{entryId}": {
+      "schema": { "$ref": "#/entities/SearchHistoryEntry" },
+      "description": "User recent search queries."
+    },
+    "/users/{userId}/devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/UserDevice" },
+      "description": "Registered playback devices."
+    },
+    "/playlists/{playlistId}": {
+      "schema": { "$ref": "#/entities/Playlist" },
+      "description": "User playlists supporting public and private visibility."
+    },
+    "/playlists/{playlistId}/tracks/{trackId}": {
+      "schema": { "$ref": "#/entities/PlaylistTrack" },
+      "description": "Tracks belonging to a playlist."
+    },
+    "/catalog_tracks/{trackId}": {
+      "schema": { "$ref": "#/entities/CatalogTrack" },
+      "description": "Backend-curated legal streaming catalog."
+    }
+  }
+}

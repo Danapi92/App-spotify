@@ -1,0 +1,254 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 120)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 600)) &&
+             data.subscriptionTier in ['free', 'premium'] &&
+             data.preferredLanguage in ['id', 'en'] &&
+             data.preferredTheme in ['dark', 'light'] &&
+             data.audioQuality in ['auto', 'standard', 'high'] &&
+             data.notificationsEnabled is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSavedTrack(data, uid) {
+      return data.userId is string && data.userId == uid &&
+             data.trackId is string && data.trackId.size() >= 1 && data.trackId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 150 &&
+             (!('albumTitle' in data) || (data.albumTitle is string && data.albumTitle.size() <= 200)) &&
+             (!('artworkUrl' in data) || (data.artworkUrl is string && data.artworkUrl.size() <= 600)) &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 800 &&
+             (!('downloadUrl' in data) || (data.downloadUrl is string && data.downloadUrl.size() <= 800)) &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+             (!('genre' in data) || (data.genre is string && data.genre.size() <= 80)) &&
+             data.downloadable is bool &&
+             data.source in ['audius', 'deezer', 'catalog'] &&
+             (!('playCount' in data) || (data.playCount is int && data.playCount >= 1 && data.playCount <= 1000000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSearchHistory(data, uid) {
+      return data.userId is string && data.userId == uid &&
+             data.query is string && data.query.size() >= 1 && data.query.size() <= 120 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidUserDevice(data, uid) {
+      return data.userId is string && data.userId == uid &&
+             data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 100 &&
+             data.platform is string && data.platform.size() >= 1 && data.platform.size() <= 50 &&
+             data.active is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPlaylist(data) {
+      return data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 80 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 300)) &&
+             (!('coverUrl' in data) || (data.coverUrl is string && data.coverUrl.size() <= 600)) &&
+             data.visibility in ['public', 'private'] &&
+             data.trackCount is int && data.trackCount >= 0 && data.trackCount <= 5000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPlaylistTrack(data, pid) {
+      return data.playlistId is string && data.playlistId == pid &&
+             data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.visibility in ['public', 'private'] &&
+             data.trackId is string && data.trackId.size() >= 1 && data.trackId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 150 &&
+             (!('albumTitle' in data) || (data.albumTitle is string && data.albumTitle.size() <= 200)) &&
+             (!('artworkUrl' in data) || (data.artworkUrl is string && data.artworkUrl.size() <= 600)) &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 800 &&
+             (!('downloadUrl' in data) || (data.downloadUrl is string && data.downloadUrl.size() <= 800)) &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+             (!('genre' in data) || (data.genre is string && data.genre.size() <= 80)) &&
+             data.downloadable is bool &&
+             data.source in ['audius', 'deezer', 'catalog'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    // User profile (contains PII like email -> strictly owner-only)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && isValidId(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'subscriptionTier', 'preferredLanguage', 'preferredTheme', 'audioQuality', 'notificationsEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'subscriptionTier', 'preferredLanguage', 'preferredTheme', 'audioQuality', 'notificationsEnabled', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) && isValidId(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'subscriptionTier', 'preferredLanguage', 'preferredTheme', 'audioQuality', 'notificationsEnabled', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Favorites subcollection
+      match /favorites/{trackId} {
+        allow get: if isOwner(userId) && isValidId(trackId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(trackId) &&
+                         incoming().keys().hasAll(['userId', 'trackId', 'title', 'artistName', 'streamUrl', 'durationSeconds', 'downloadable', 'source', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'trackId', 'title', 'artistName', 'albumTitle', 'artworkUrl', 'streamUrl', 'downloadUrl', 'durationSeconds', 'genre', 'downloadable', 'source', 'playCount', 'createdAt', 'updatedAt']) &&
+                         isValidSavedTrack(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(trackId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidSavedTrack(incoming(), userId) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'artistName', 'albumTitle', 'artworkUrl', 'streamUrl', 'downloadUrl', 'durationSeconds', 'genre', 'downloadable', 'source', 'playCount', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(trackId);
+      }
+
+      // Listening history subcollection
+      match /history/{historyId} {
+        allow get: if isOwner(userId) && isValidId(historyId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(historyId) &&
+                         incoming().keys().hasAll(['userId', 'trackId', 'title', 'artistName', 'streamUrl', 'durationSeconds', 'downloadable', 'source', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'trackId', 'title', 'artistName', 'albumTitle', 'artworkUrl', 'streamUrl', 'downloadUrl', 'durationSeconds', 'genre', 'downloadable', 'source', 'playCount', 'createdAt', 'updatedAt']) &&
+                         isValidSavedTrack(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(historyId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidSavedTrack(incoming(), userId) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'artistName', 'albumTitle', 'artworkUrl', 'streamUrl', 'downloadUrl', 'durationSeconds', 'genre', 'downloadable', 'source', 'playCount', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(historyId);
+      }
+
+      // Search history subcollection
+      match /search_history/{entryId} {
+        allow get: if isOwner(userId) && isValidId(entryId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(entryId) &&
+                         incoming().keys().hasAll(['userId', 'query', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'query', 'createdAt']) &&
+                         isValidSearchHistory(incoming(), userId);
+
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(entryId);
+      }
+
+      // Registered devices subcollection
+      match /devices/{deviceId} {
+        allow get: if isOwner(userId) && isValidId(deviceId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(deviceId) &&
+                         incoming().keys().hasAll(['userId', 'deviceName', 'platform', 'active', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'deviceName', 'platform', 'active', 'createdAt', 'updatedAt']) &&
+                         isValidUserDevice(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(deviceId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidUserDevice(incoming(), userId) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['deviceName', 'platform', 'active', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(deviceId);
+      }
+    }
+
+    // Playlists (public & private)
+    match /playlists/{playlistId} {
+      allow get: if isSignedIn() && isValidId(playlistId) &&
+                    (existing().ownerId == request.auth.uid || existing().visibility == 'public');
+
+      allow list: if isSignedIn() &&
+                     (resource.data.ownerId == request.auth.uid || resource.data.visibility == 'public');
+
+      allow create: if isSignedIn() && isValidId(playlistId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerId', 'ownerName', 'name', 'visibility', 'trackCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'ownerName', 'name', 'description', 'coverUrl', 'visibility', 'trackCount', 'createdAt', 'updatedAt']) &&
+                       isValidPlaylist(incoming());
+
+      allow update: if isSignedIn() && isValidId(playlistId) &&
+                       existing().ownerId == request.auth.uid &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidPlaylist(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'coverUrl', 'visibility', 'trackCount', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(playlistId) && existing().ownerId == request.auth.uid;
+
+      match /tracks/{trackId} {
+        allow get: if isSignedIn() && isValidId(playlistId) && isValidId(trackId) &&
+                      (existing().ownerId == request.auth.uid || existing().visibility == 'public');
+
+        allow list: if isSignedIn() &&
+                       (resource.data.ownerId == request.auth.uid || resource.data.visibility == 'public');
+
+        allow create: if isSignedIn() && isValidId(playlistId) && isValidId(trackId) &&
+                         incoming().ownerId == request.auth.uid &&
+                         incoming().keys().hasAll(['playlistId', 'ownerId', 'visibility', 'trackId', 'title', 'artistName', 'streamUrl', 'durationSeconds', 'downloadable', 'source', 'createdAt']) &&
+                         incoming().keys().hasOnly(['playlistId', 'ownerId', 'visibility', 'trackId', 'title', 'artistName', 'albumTitle', 'artworkUrl', 'streamUrl', 'downloadUrl', 'durationSeconds', 'genre', 'downloadable', 'source', 'createdAt']) &&
+                         isValidPlaylistTrack(incoming(), playlistId) &&
+                         get(/databases/$(database)/documents/playlists/$(playlistId)).data.ownerId == request.auth.uid;
+
+        allow update: if isSignedIn() && isValidId(playlistId) && isValidId(trackId) &&
+                         existing().ownerId == request.auth.uid &&
+                         incoming().ownerId == existing().ownerId &&
+                         incoming().playlistId == existing().playlistId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidPlaylistTrack(incoming(), playlistId) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['visibility']);
+
+        allow delete: if isSignedIn() && isValidId(playlistId) && isValidId(trackId) &&
+                         existing().ownerId == request.auth.uid;
+      }
+    }
+
+    // Backend-managed legal streaming catalog (read-only for clients)
+    match /catalog_tracks/{trackId} {
+      allow get: if isSignedIn() && isValidId(trackId) && existing().published == true;
+      allow list: if isSignedIn() && resource.data.published == true;
+      allow write: if false;
+    }
+  }
+}

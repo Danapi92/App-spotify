@@ -1,0 +1,6 @@
+{
+  "name": "Stream Music",
+  "description": "Modern legal music streaming Android app with Media3 ExoPlayer, cloud-synced playlists, and Google Sign-In.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
