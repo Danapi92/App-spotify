@@ -1,0 +1,146 @@
+name: Build & Publish Android Debug APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Debug APK & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Detect Gradle configuration
+        id: gradle_info
+        shell: bash
+        run: |
+          if [ -f "./gradlew" ] && [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "use_wrapper=true" >> "$GITHUB_OUTPUT"
+          else
+            VERSION="9.3.1"
+            if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
+              PARSED=$(sed -n 's/.*gradle-\([0-9][0-9.]*\)-.*/\1/p' gradle/wrapper/gradle-wrapper.properties | head -n 1)
+              if [ -n "$PARSED" ]; then
+                VERSION="$PARSED"
+              fi
+            fi
+            echo "use_wrapper=false" >> "$GITHUB_OUTPUT"
+            echo "gradle_version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Detected Gradle version: $VERSION"
+          fi
+
+      - name: Set up Gradle (Wrapper)
+        if: steps.gradle_info.outputs.use_wrapper == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Gradle (Standalone)
+        if: steps.gradle_info.outputs.use_wrapper != 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ steps.gradle_info.outputs.gradle_version }}
+
+      - name: Prepare debug keystore
+        shell: bash
+        run: |
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              base64 -d debug.keystore.base64 > debug.keystore
+              echo "Restored debug.keystore from debug.keystore.base64"
+            elif grep -rq "debug\.keystore" . --include="*.gradle" --include="*.gradle.kts" 2>/dev/null; then
+              keytool -genkeypair -v \
+                -keystore debug.keystore \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+              echo "Generated fallback debug.keystore"
+            fi
+          fi
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          if [ "${{ steps.gradle_info.outputs.use_wrapper }}" = "true" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: Locate and verify debug APK
+        shell: bash
+        run: |
+          APK_PATH=$(find . -path "*/build/outputs/apk/debug/*.apk" ! -name "*-unsigned.apk" ! -name "*-unaligned.apk" | sort | head -n 1)
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: No signed debug APK found under */build/outputs/apk/debug/." >&2
+            exit 1
+          fi
+          mkdir -p release-assets
+          cp "$APK_PATH" release-assets/app-debug.apk
+          ls -lh release-assets/app-debug.apk
+          APKSIGNER=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --print-certs release-assets/app-debug.apk
+          fi
+
+      - name: Upload APK workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: release-assets/app-debug.apk
+          if-no-files-found: error
+
+      - name: Determine release tag
+        id: release_meta
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "title=Release ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "title=Latest Debug Build (${GITHUB_SHA::7})" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.title }}
+          files: release-assets/app-debug.apk
+          overwrite_files: true
+          make_latest: true
+          draft: false
+          prerelease: false
+          body: |
+            Automated signed debug APK build from commit `${{ github.sha }}`.
+
+            ### Permanent Direct APK Download URL
+            `https://github.com/${{ github.repository }}/releases/latest/download/app-debug.apk`
